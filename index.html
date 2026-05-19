@@ -1097,6 +1097,10 @@ function renderResume() {
   const r = loadResume();
   const section = document.getElementById('resume-section');
   if (r) {
+    const isPDF = r.type === 'application/pdf' || r.name.endsWith('.pdf');
+    const preview = isPDF
+      ? `<iframe src="${r.data}" style="width:100%;height:700px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px"></iframe>`
+      : `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:20px;text-align:center;color:var(--text-muted);margin-bottom:16px;font-size:14px">Preview not available for DOCX — download to view</div>`;
     section.innerHTML = `
       <div class="resume-current">
         <div class="resume-icon">📄</div>
@@ -1106,6 +1110,7 @@ function renderResume() {
           <button class="btn btn-danger btn-sm" onclick="deleteResume()">Remove</button>
         </div>
       </div>
+      ${preview}
       <label class="big-upload" style="padding:20px">
         <input type="file" accept=".pdf,.docx,.doc" onchange="uploadResume(event)">
         <p><strong>Replace resume</strong> — click to upload a new file</p>
