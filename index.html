@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Internship Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --bg: #F1F5F9;
+      --surface: #FFFFFF;
+      --border: #E2E8F0;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-lg: 0 10px 25px rgba(0,0,0,0.12);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+    nav { display: flex; gap: 4px; }
+    nav button {
+      padding: 6px 16px;
+      border: none;
+      background: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    nav button:hover { background: var(--bg); color: var(--text); }
+    nav button.active { background: #EEF2FF; color: var(--primary); }
+
+    /* ── Sync status ── */
+    .sync-pill {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .sync-pill:hover { background: var(--bg); }
+    .sync-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .sync-dot.none     { background: #CBD5E1; }
+    .sync-dot.synced   { background: #10B981; }
+    .sync-dot.stale    { background: #F59E0B; }
+    .sync-dot.error    { background: #EF4444; }
+
+    /* ── Layout ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
+
+    /* ── Sync info banner ── */
+    .sync-banner {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #1D4ED8;
+      display: none;
+    }
+    .sync-banner.show { display: flex; align-items: center; gap: 10px; }
+    .sync-banner button {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: #1D4ED8;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    /* ── Stats ── */
+    .stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      flex: 1;
+      min-width: 120px;
+      box-shadow: var(--shadow);
+    }
+    .stat-card .num {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .toolbar input[type=search] {
+      flex: 1;
+      min-width: 180px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .toolbar input[type=search]:focus { border-color: var(--primary); }
+    .toolbar select {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      background: var(--surface);
+      cursor: pointer;
+      outline: none;
+      color: var(--text);
+    }
+
+    /* ── Export dropdown ── */
+    .export-group { position: relative; }
+    .export-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow-lg);
+      min-width: 200px;
+      z-index: 50;
+      overflow: hidden;
+    }
+    .export-menu.open { display: block; }
+    .export-menu-item {
+      display: block;
+      width: 100%;
+      padding: 11px 16px;
+      text-align: left;
+      border: none;
+      background: none;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text);
+      transition: background 0.1s;
+    }
+    .export-menu-item:hover { background: var(--bg); }
+    .export-menu-item .mi-label { font-weight: 500; }
+    .export-menu-item .mi-sub { color: var(--text-muted); font-size: 12px; margin-top: 1px; }
+    .export-menu hr { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); }
+    .btn-danger { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+    .btn-danger:hover { background: #FEE2E2; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th {
+      background: #F8FAFC;
+      border-bottom: 1px solid var(--border);
+      padding: 11px 14px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { color: var(--text); }
+    thead th .sort-icon { margin-left: 4px; opacity: 0.4; }
+    thead th.sorted .sort-icon { opacity: 1; color: var(--primary); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #F8FAFC; }
+    td { padding: 12px 14px; vertical-align: middle; }
+    .company-name { font-weight: 600; }
+    .role-name { color: var(--text-muted); font-size: 13px; }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-wishlist  { background:#F1F5F9; color:#475569; }
+    .badge-applied   { background:#EFF6FF; color:#1D4ED8; }
+    .badge-phone     { background:#F5F3FF; color:#6D28D9; }
+    .badge-interview { background:#FFFBEB; color:#B45309; }
+    .badge-offer     { background:#ECFDF5; color:#065F46; }
+    .badge-rejected  { background:#FEF2F2; color:#B91C1C; }
+    .badge-withdrawn { background:#F9FAFB; color:#374151; }
+
+    .actions { display: flex; gap: 6px; }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty svg { margin-bottom: 12px; opacity: 0.3; }
+    .empty p { font-size: 15px; margin-bottom: 16px; }
+
+    /* ── Modal ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 28px;
+    }
+    .modal h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 5px;
+      color: var(--text-muted);
+    }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+    }
+    .field textarea { resize: vertical; min-height: 80px; }
+
+    .interview-dates { display: flex; flex-direction: column; gap: 6px; }
+    .interview-date-row { display: flex; gap: 6px; align-items: center; }
+    .interview-date-row input { flex: 1; }
+    .interview-date-row button {
+      background: none; border: none; cursor: pointer;
+      color: #DC2626; font-size: 18px; padding: 0 4px; line-height: 1;
+    }
+    .add-date-btn {
+      font-size: 13px; color: var(--primary); background: none;
+      border: none; cursor: pointer; padding: 4px 0; font-weight: 500;
+    }
+    .add-date-btn:hover { text-decoration: underline; }
+
+    .file-upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .file-upload-area:hover { border-color: var(--primary); background: #EEF2FF; }
+    .file-upload-area.has-file { border-style: solid; border-color: #10B981; background: #ECFDF5; }
+    .file-upload-area input[type=file] { display: none; }
+    .file-upload-area p { font-size: 13px; color: var(--text-muted); }
+    .file-upload-area .file-name { font-size: 13px; color: #065F46; font-weight: 500; }
+
+    .modal-footer {
+      display: flex; gap: 8px; justify-content: flex-end;
+      margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
+    }
+
+    /* ── Detail modal ── */
+    .detail-section { margin-bottom: 20px; }
+    .detail-section h3 {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 10px;
+    }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .detail-item .di-label { font-size: 12px; color: var(--text-muted); }
+    .detail-item .di-val { font-size: 14px; font-weight: 500; margin-top: 2px; }
+    .detail-item .di-val a { color: var(--primary); }
+    .detail-notes {
+      background: var(--bg); border-radius: 8px; padding: 12px;
+      font-size: 14px; line-height: 1.5; white-space: pre-wrap;
+    }
+
+    /* ── Resume tab ── */
+    .resume-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 32px; max-width: 600px;
+    }
+    .resume-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .resume-card .sub { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; }
+    .resume-current {
+      display: flex; align-items: center; gap: 14px;
+      background: #ECFDF5; border: 1px solid #6EE7B7;
+      border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;
+    }
+    .resume-icon { font-size: 28px; }
+    .resume-info .rname { font-weight: 600; font-size: 15px; }
+    .resume-info .rdate { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .resume-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
+
+    .big-upload {
+      border: 2px dashed var(--border); border-radius: 10px;
+      padding: 40px; text-align: center; cursor: pointer; transition: all 0.15s;
+    }
+    .big-upload:hover { border-color: var(--primary); background: #EEF2FF; }
+    .big-upload input[type=file] { display: none; }
+    .big-upload .upload-icon { font-size: 36px; margin-bottom: 10px; }
+    .big-upload p { color: var(--text-muted); font-size: 14px; }
+    .big-upload strong { color: var(--primary); }
+
+    /* ── Sync modal ── */
+    .sync-option {
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.15s;
+    }
+    .sync-option:hover { border-color: var(--primary); background: #F8FAFF; }
+    .sync-option h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .sync-option p { font-size: 13px; color: var(--text-muted); }
+    .sync-connected {
+      background: #ECFDF5; border: 1px solid #6EE7B7;
+      border-radius: 10px; padding: 16px; margin-bottom: 12px;
+    }
+    .sync-connected .sc-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .sync-connected .sc-name { font-weight: 600; font-size: 15px; margin: 4px 0 12px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: #1E293B; color: white;
+      padding: 10px 18px; border-radius: 8px; font-size: 14px;
+      z-index: 999; opacity: 0; transform: translateY(8px);
+      transition: all 0.2s; pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Confirm ── */
+    .confirm-body { text-align: center; padding: 8px 0; }
+    .confirm-body p { color: var(--text-muted); font-size: 14px; margin-top: 8px; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎓 Internship Tracker</h1>
+  <nav>
+    <button class="active" onclick="showView('apps')">Applications</button>
+    <button onclick="showView('resume')">Resume</button>
+  </nav>
+  <button class="sync-pill" id="sync-pill" onclick="openSyncModal()">
+    <span class="sync-dot none" id="sync-dot"></span>
+    <span id="sync-label">Local only</span>
+  </button>
+</header>
+
+<main>
+  <!-- Applications View -->
+  <div id="view-apps" class="view active">
+    <div id="sync-banner" class="sync-banner">
+      <span>💡 Your data is saved locally. Connect a sync file (in Dropbox/OneDrive) to access it on any device.</span>
+      <button onclick="document.getElementById('sync-banner').classList.remove('show')">×</button>
+    </div>
+    <div class="stats" id="stats-bar"></div>
+    <div class="toolbar">
+      <input type="search" id="search-input" placeholder="Search company or role…" oninput="renderTable()">
+      <select id="filter-status" onchange="renderTable()">
+        <option value="">All Statuses</option>
+        <option value="wishlist">Wishlist</option>
+        <option value="applied">Applied</option>
+        <option value="phone">Phone Screen</option>
+        <option value="interview">Interview</option>
+        <option value="offer">Offer</option>
+        <option value="rejected">Rejected</option>
+        <option value="withdrawn">Withdrawn</option>
+      </select>
+      <div class="export-group">
+        <button class="btn btn-ghost" id="export-btn" onclick="toggleExportMenu(event)">Export ▾</button>
+        <div class="export-menu" id="export-menu">
+          <button class="export-menu-item" onclick="exportXLSX(); closeExportMenu()">
+            <div class="mi-label">📊 Export as XLSX</div>
+            <div class="mi-sub">Opens in Excel / Google Sheets</div>
+          </button>
+          <hr>
+          <button class="export-menu-item" onclick="exportJSON(); closeExportMenu()">
+            <div class="mi-label">💾 Export as JSON (full backup)</div>
+            <div class="mi-sub">Includes cover letter attachments</div>
+          </button>
+          <hr>
+          <label class="export-menu-item" style="cursor:pointer">
+            <div class="mi-label">📥 Import JSON backup</div>
+            <div class="mi-sub">Merge into current data</div>
+            <input type="file" accept=".json" style="display:none" onchange="importData(event)">
+          </label>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="openAddModal()">+ Add Application</button>
+    </div>
+    <div class="table-wrap">
+      <table id="apps-table">
+        <thead>
+          <tr>
+            <th onclick="sortBy('company')">Company <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('role')">Role <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('status')">Status <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('dateApplied')">Applied <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('deadline')">Deadline <span class="sort-icon">↕</span></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="apps-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Resume View -->
+  <div id="view-resume" class="view">
+    <div class="resume-card">
+      <h2>My Resume</h2>
+      <p class="sub">Store your resume here for quick access. Attach cover letters per application in the Applications tab.</p>
+      <div id="resume-section"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <h2 id="modal-title">Add Application</h2>
+    <form id="app-form" onsubmit="saveApplication(event)">
+      <div class="form-grid">
+        <div class="field">
+          <label>Company *</label>
+          <input type="text" id="f-company" required placeholder="Google, Meta…">
+        </div>
+        <div class="field">
+          <label>Role *</label>
+          <input type="text" id="f-role" required placeholder="Software Engineer Intern">
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="wishlist">Wishlist</option>
+            <option value="applied" selected>Applied</option>
+            <option value="phone">Phone Screen</option>
+            <option value="interview">Interview</option>
+            <option value="offer">Offer</option>
+            <option value="rejected">Rejected</option>
+            <option value="withdrawn">Withdrawn</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Date Applied</label>
+          <input type="date" id="f-dateApplied">
+        </div>
+        <div class="field">
+          <label>Deadline</label>
+          <input type="date" id="f-deadline">
+        </div>
+        <div class="field">
+          <label>Job Posting URL</label>
+          <input type="url" id="f-url" placeholder="https://…">
+        </div>
+        <div class="field">
+          <label>Contact Name</label>
+          <input type="text" id="f-contactName" placeholder="Recruiter name">
+        </div>
+        <div class="field">
+          <label>Contact Email</label>
+          <input type="email" id="f-contactEmail" placeholder="recruiter@company.com">
+        </div>
+        <div class="field full">
+          <label>Interview Dates</label>
+          <div class="interview-dates" id="interview-dates-container"></div>
+          <button type="button" class="add-date-btn" onclick="addInterviewDate()">+ Add interview date</button>
+        </div>
+        <div class="field full">
+          <label>Cover Letter</label>
+          <div class="file-upload-area" id="cl-upload-area" onclick="document.getElementById('f-coverLetter').click()">
+            <input type="file" id="f-coverLetter" accept=".pdf,.docx,.doc,.txt" onchange="handleCLUpload(event)">
+            <p id="cl-upload-text">Click to upload cover letter (PDF, DOCX)</p>
+          </div>
+        </div>
+        <div class="field full">
+          <label>Notes</label>
+          <textarea id="f-notes" placeholder="Any notes about this application…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModalDirect()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="modal-save-btn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="modal" id="detail-modal-content" style="max-width:560px"></div>
+</div>
+
+<!-- Sync Modal -->
+<div class="overlay" id="sync-overlay" onclick="closeSyncModal(event)">
+  <div class="modal" style="max-width:480px">
+    <h2>Cross-device Sync</h2>
+    <div id="sync-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSyncModalDirect()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="overlay" id="confirm-overlay">
+  <div class="modal" style="max-width:380px">
+    <h2 id="confirm-title">Confirm</h2>
+    <div class="confirm-body"><p id="confirm-msg"></p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="confirmResolve(false)">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmResolve(true)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const APPS_KEY   = 'itracker_apps';
+const RESUME_KEY = 'itracker_resume';
+const SYNC_DISMISSED = 'itracker_sync_dismissed';
+
+let editingId    = null;
+let sortCol      = 'dateApplied';
+let sortDir      = -1;
+let pendingCL    = null;
+let confirmResolve = () => {};
+let syncFileHandle = null;  // File System Access API handle
+let syncFileName   = null;
+
+// ── IndexedDB for persisting the file handle ──────────────
+function getDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('itracker_sync', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('meta');
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = reject;
+  });
+}
+async function idbGet(key) {
+  const db = await getDB();
+  return new Promise(resolve => {
+    const tx = db.transaction('meta', 'readonly');
+    const req = tx.objectStore('meta').get(key);
+    req.onsuccess = e => resolve(e.target.result ?? null);
+    req.onerror = () => resolve(null);
+  });
+}
+async function idbSet(key, val) {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('meta', 'readwrite');
+    tx.objectStore('meta').put(val, key);
+    tx.oncomplete = resolve;
+    tx.onerror = reject;
+  });
+}
+async function idbDel(key) {
+  const db = await getDB();
+  return new Promise(resolve => {
+    const tx = db.transaction('meta', 'readwrite');
+    tx.objectStore('meta').delete(key);
+    tx.oncomplete = resolve;
+    tx.onerror = resolve;
+  });
+}
+
+// ── Storage ───────────────────────────────────────────────
+function loadApps() {
+  try { return JSON.parse(localStorage.getItem(APPS_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveApps(apps) {
+  localStorage.setItem(APPS_KEY, JSON.stringify(apps));
+  writeToSyncFile();
+}
+function loadResume() {
+  try { return JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); }
+  catch { return null; }
+}
+function saveResume(r) {
+  localStorage.setItem(RESUME_KEY, JSON.stringify(r));
+  writeToSyncFile();
+}
+
+// ── Sync file (File System Access API) ───────────────────
+async function writeToSyncFile() {
+  if (!syncFileHandle) return;
+  try {
+    const perm = await syncFileHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      const req = await syncFileHandle.requestPermission({ mode: 'readwrite' });
+      if (req !== 'granted') return;
+    }
+    const payload = JSON.stringify({ apps: loadApps(), resume: loadResume(), savedAt: new Date().toISOString() }, null, 2);
+    const writable = await syncFileHandle.createWritable();
+    await writable.write(payload);
+    await writable.close();
+    updateSyncStatus('synced');
+  } catch (e) {
+    console.warn('Sync write failed:', e);
+    updateSyncStatus('error');
+  }
+}
+
+async function readFromSyncFile() {
+  if (!syncFileHandle) return false;
+  try {
+    const perm = await syncFileHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') { updateSyncStatus('stale'); return false; }
+    const file = await syncFileHandle.getFile();
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (Array.isArray(data.apps)) localStorage.setItem(APPS_KEY, JSON.stringify(data.apps));
+    if (data.resume) localStorage.setItem(RESUME_KEY, JSON.stringify(data.resume));
+    updateSyncStatus('synced');
+    return true;
+  } catch (e) {
+    console.warn('Sync read failed:', e);
+    updateSyncStatus('error');
+    return false;
+  }
+}
+
+async function connectNewSyncFile() {
+  if (!window.showSaveFilePicker) {
+    alert('Your browser does not support the File System Access API.\nTry Chrome or Edge instead.');
+    return;
+  }
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: 'internship-tracker-data.json',
+      types: [{ description: 'JSON data file', accept: { 'application/json': ['.json'] } }],
+    });
+    syncFileHandle = handle;
+    syncFileName = handle.name;
+    await idbSet('fileHandle', handle);
+    await idbSet('fileName', handle.name);
+    await writeToSyncFile();
+    renderSyncModal();
+    toast('Sync file connected — save it to Dropbox/OneDrive to sync across devices');
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Could not connect sync file');
+  }
+}
+
+async function openExistingSyncFile() {
+  if (!window.showOpenFilePicker) {
+    alert('Your browser does not support the File System Access API.\nTry Chrome or Edge instead.');
+    return;
+  }
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'JSON data file', accept: { 'application/json': ['.json'] } }],
+    });
+    syncFileHandle = handle;
+    syncFileName = handle.name;
+    await idbSet('fileHandle', handle);
+    await idbSet('fileName', handle.name);
+    await readFromSyncFile();
+    renderTable();
+    renderSyncModal();
+    toast('Loaded data from sync file');
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Could not open sync file');
+  }
+}
+
+async function disconnectSync() {
+  const ok = await confirm('Disconnect sync file?', 'Your data stays on this device. The sync file is not deleted.');
+  if (!ok) return;
+  syncFileHandle = null;
+  syncFileName = null;
+  await idbDel('fileHandle');
+  await idbDel('fileName');
+  updateSyncStatus('none');
+  renderSyncModal();
+  toast('Sync file disconnected');
+}
+
+function updateSyncStatus(state) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  dot.className = 'sync-dot ' + state;
+  const labels = { none: 'Local only', synced: syncFileName || 'Synced', stale: 'Permission needed', error: 'Sync error' };
+  label.textContent = labels[state] || state;
+}
+
+// ── Sync modal ────────────────────────────────────────────
+function openSyncModal() {
+  renderSyncModal();
+  document.getElementById('sync-overlay').classList.add('open');
+}
+function closeSyncModal(e) {
+  if (e.target === document.getElementById('sync-overlay')) closeSyncModalDirect();
+}
+function closeSyncModalDirect() {
+  document.getElementById('sync-overlay').classList.remove('open');
+}
+
+function renderSyncModal() {
+  const body = document.getElementById('sync-modal-body');
+  if (syncFileHandle) {
+    body.innerHTML = `
+      <div class="sync-connected">
+        <div class="sc-label">Connected sync file</div>
+        <div class="sc-name">📄 ${esc(syncFileName)}</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+          Every change is automatically written to this file. Store it in your Dropbox, OneDrive, or Google Drive folder so it syncs across devices. On another device, open this tracker and use <strong>Open existing sync file</strong> to load it.
+        </p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="writeToSyncFile();toast('Saved to sync file')">Force save</button>
+          <button class="btn btn-danger btn-sm" onclick="disconnectSync()">Disconnect</button>
+        </div>
+      </div>
+    `;
+  } else {
+    const fsa = !!window.showSaveFilePicker;
+    body.innerHTML = `
+      <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">
+        By default, data is stored in this browser's local storage — it won't appear on other devices. Connect a sync file to fix that:
+      </p>
+      <div class="sync-option" onclick="connectNewSyncFile()">
+        <h3>📂 Create a new sync file</h3>
+        <p>Pick a location in your Dropbox / OneDrive / Google Drive. Your data will be saved there and synced automatically.</p>
+      </div>
+      <div class="sync-option" onclick="openExistingSyncFile()">
+        <h3>🔗 Open an existing sync file</h3>
+        <p>Already set this up on another device? Load the same .json file to pull in your data.</p>
+      </div>
+      ${!fsa ? `<p style="font-size:12px;color:#DC2626;margin-top:8px">⚠ Your browser doesn't support the File System API. Use Chrome or Edge for sync.</p>` : ''}
+      <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+      <p style="font-size:13px;color:var(--text-muted)">
+        <strong>Alternative:</strong> Use <em>Export JSON (full backup)</em> on one device and <em>Import JSON</em> on the other to manually transfer data.
+      </p>
+    `;
+  }
+}
+
+// ── View switching ────────────────────────────────────────
+function showView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelectorAll('nav button')[v === 'apps' ? 0 : 1].classList.add('active');
+  if (v === 'resume') renderResume();
+  if (v === 'apps') renderTable();
+}
+
+// ── Stats ─────────────────────────────────────────────────
+function renderStats() {
+  const apps = loadApps();
+  const c = { total: apps.length, applied: 0, interview: 0, offer: 0, rejected: 0 };
+  apps.forEach(a => {
+    if (a.status === 'applied' || a.status === 'phone') c.applied++;
+    if (a.status === 'interview') c.interview++;
+    if (a.status === 'offer') c.offer++;
+    if (a.status === 'rejected') c.rejected++;
+  });
+  const colors = { total:'#4F46E5', applied:'#1D4ED8', interview:'#B45309', offer:'#065F46', rejected:'#B91C1C' };
+  const labels = { total:'Total', applied:'In Progress', interview:'Interviews', offer:'Offers', rejected:'Rejected' };
+  document.getElementById('stats-bar').innerHTML = Object.entries(c).map(([k, v]) =>
+    `<div class="stat-card"><div class="num" style="color:${colors[k]}">${v}</div><div class="label">${labels[k]}</div></div>`
+  ).join('');
+}
+
+// ── Table ─────────────────────────────────────────────────
+const STATUS_META = {
+  wishlist:  { label:'Wishlist',     cls:'badge-wishlist' },
+  applied:   { label:'Applied',      cls:'badge-applied' },
+  phone:     { label:'Phone Screen', cls:'badge-phone' },
+  interview: { label:'Interview',    cls:'badge-interview' },
+  offer:     { label:'Offer',        cls:'badge-offer' },
+  rejected:  { label:'Rejected',     cls:'badge-rejected' },
+  withdrawn: { label:'Withdrawn',    cls:'badge-withdrawn' },
+};
+
+function formatDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${m}/${day}/${y}`;
+}
+
+function renderTable() {
+  renderStats();
+  const query = document.getElementById('search-input').value.toLowerCase();
+  const fs = document.getElementById('filter-status').value;
+  let apps = loadApps();
+  if (query) apps = apps.filter(a => a.company.toLowerCase().includes(query) || a.role.toLowerCase().includes(query));
+  if (fs) apps = apps.filter(a => a.status === fs);
+  apps.sort((a, b) => {
+    let va = (a[sortCol] || '').toString().toLowerCase();
+    let vb = (b[sortCol] || '').toString().toLowerCase();
+    return va < vb ? sortDir : va > vb ? -sortDir : 0;
+  });
+
+  const tbody = document.getElementById('apps-tbody');
+  if (apps.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+      <p>No applications yet. Click <strong>+ Add Application</strong> to get started.</p>
+    </div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = apps.map(a => {
+    const sm = STATUS_META[a.status] || STATUS_META.applied;
+    return `<tr>
+      <td><div class="company-name">${esc(a.company)}</div></td>
+      <td><div class="role-name">${esc(a.role)}</div></td>
+      <td><span class="badge ${sm.cls}">${sm.label}</span>${a.coverLetter ? ' <span title="Has cover letter" style="font-size:11px;color:#64748B">📎</span>' : ''}</td>
+      <td>${formatDate(a.dateApplied)}</td>
+      <td>${formatDate(a.deadline)}</td>
+      <td><div class="actions">
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${a.id}')">View</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEditModal('${a.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteApp('${a.id}')">Delete</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+  renderTable();
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Add/Edit Modal ────────────────────────────────────────
+function openAddModal() {
+  editingId = null; pendingCL = null;
+  document.getElementById('modal-title').textContent = 'Add Application';
+  document.getElementById('modal-save-btn').textContent = 'Add Application';
+  document.getElementById('app-form').reset();
+  document.getElementById('f-dateApplied').value = new Date().toISOString().slice(0,10);
+  document.getElementById('interview-dates-container').innerHTML = '';
+  resetCLUpload();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function openEditModal(id) {
+  const a = loadApps().find(x => x.id === id);
+  if (!a) return;
+  editingId = id; pendingCL = a.coverLetter || null;
+  document.getElementById('modal-title').textContent = 'Edit Application';
+  document.getElementById('modal-save-btn').textContent = 'Save Changes';
+  document.getElementById('f-company').value = a.company || '';
+  document.getElementById('f-role').value = a.role || '';
+  document.getElementById('f-status').value = a.status || 'applied';
+  document.getElementById('f-dateApplied').value = a.dateApplied || '';
+  document.getElementById('f-deadline').value = a.deadline || '';
+  document.getElementById('f-url').value = a.url || '';
+  document.getElementById('f-contactName').value = a.contactName || '';
+  document.getElementById('f-contactEmail').value = a.contactEmail || '';
+  document.getElementById('f-notes').value = a.notes || '';
+  document.getElementById('interview-dates-container').innerHTML = '';
+  (a.interviewDates || []).forEach(d => addInterviewDate(d));
+  a.coverLetter ? setCLDisplay(a.coverLetter.name) : resetCLUpload();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(e) { if (e.target === document.getElementById('modal-overlay')) closeModalDirect(); }
+function closeModalDirect() { document.getElementById('modal-overlay').classList.remove('open'); pendingCL = null; }
+
+function saveApplication(e) {
+  e.preventDefault();
+  const apps = loadApps();
+  const interviewDates = [...document.querySelectorAll('.interview-date-input')].map(i => i.value).filter(Boolean);
+  const app = {
+    company: document.getElementById('f-company').value.trim(),
+    role: document.getElementById('f-role').value.trim(),
+    status: document.getElementById('f-status').value,
+    dateApplied: document.getElementById('f-dateApplied').value,
+    deadline: document.getElementById('f-deadline').value,
+    url: document.getElementById('f-url').value.trim(),
+    contactName: document.getElementById('f-contactName').value.trim(),
+    contactEmail: document.getElementById('f-contactEmail').value.trim(),
+    interviewDates,
+    notes: document.getElementById('f-notes').value.trim(),
+    coverLetter: pendingCL || null,
+  };
+  if (editingId) {
+    const idx = apps.findIndex(x => x.id === editingId);
+    if (idx !== -1) apps[idx] = { ...apps[idx], ...app };
+    saveApps(apps); toast('Application updated');
+  } else {
+    app.id = Date.now().toString();
+    app.createdAt = new Date().toISOString();
+    apps.push(app); saveApps(apps); toast('Application added');
+  }
+  closeModalDirect(); renderTable();
+}
+
+// ── Interview dates ───────────────────────────────────────
+function addInterviewDate(val = '') {
+  const row = document.createElement('div');
+  row.className = 'interview-date-row';
+  row.innerHTML = `<input type="datetime-local" class="interview-date-input" value="${val}">
+    <button type="button" onclick="this.parentElement.remove()">×</button>`;
+  document.getElementById('interview-dates-container').appendChild(row);
+}
+
+// ── Cover Letter ──────────────────────────────────────────
+function handleCLUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('File too large (max 5 MB)'); return; }
+  const reader = new FileReader();
+  reader.onload = ev => { pendingCL = { name: file.name, data: ev.target.result, type: file.type }; setCLDisplay(file.name); };
+  reader.readAsDataURL(file);
+}
+function setCLDisplay(name) {
+  document.getElementById('cl-upload-area').classList.add('has-file');
+  document.getElementById('cl-upload-text').innerHTML =
+    `📎 <span class="file-name">${esc(name)}</span> <span style="color:#64748B;font-size:12px">(click to replace)</span>`;
+}
+function resetCLUpload() {
+  document.getElementById('cl-upload-area').classList.remove('has-file');
+  document.getElementById('cl-upload-text').textContent = 'Click to upload cover letter (PDF, DOCX)';
+  document.getElementById('f-coverLetter').value = '';
+}
+
+// ── Detail ────────────────────────────────────────────────
+function openDetail(id) {
+  const a = loadApps().find(x => x.id === id);
+  if (!a) return;
+  const sm = STATUS_META[a.status] || STATUS_META.applied;
+  const interviewHtml = (a.interviewDates || []).length
+    ? a.interviewDates.map(d => `<div>${new Date(d).toLocaleString()}</div>`).join('')
+    : '<span style="color:var(--text-muted)">None scheduled</span>';
+  const clHtml = a.coverLetter
+    ? `<button class="btn btn-ghost btn-sm" onclick="downloadFile(${JSON.stringify(JSON.stringify(a.coverLetter))})">⬇ Download Cover Letter</button>`
+    : '<span style="color:var(--text-muted);font-size:13px">No cover letter attached</span>';
+  document.getElementById('detail-modal-content').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div><h2 style="font-size:20px">${esc(a.company)}</h2><div style="color:var(--text-muted);font-size:14px;margin-top:2px">${esc(a.role)}</div></div>
+      <span class="badge ${sm.cls}" style="font-size:13px">${sm.label}</span>
+    </div>
+    <div class="detail-section"><h3>Details</h3>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="di-label">Date Applied</div><div class="di-val">${formatDate(a.dateApplied)}</div></div>
+        <div class="detail-item"><div class="di-label">Deadline</div><div class="di-val">${formatDate(a.deadline)}</div></div>
+        <div class="detail-item"><div class="di-label">Contact</div><div class="di-val">${esc(a.contactName)||'—'}</div></div>
+        <div class="detail-item"><div class="di-label">Contact Email</div><div class="di-val">${a.contactEmail?`<a href="mailto:${esc(a.contactEmail)}">${esc(a.contactEmail)}</a>`:'—'}</div></div>
+        <div class="detail-item" style="grid-column:1/-1"><div class="di-label">Job Posting</div><div class="di-val">${a.url?`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url)}</a>`:'—'}</div></div>
+      </div>
+    </div>
+    <div class="detail-section"><h3>Interview Dates</h3>${interviewHtml}</div>
+    <div class="detail-section"><h3>Cover Letter</h3>${clHtml}</div>
+    ${a.notes?`<div class="detail-section"><h3>Notes</h3><div class="detail-notes">${esc(a.notes)}</div></div>`:''}
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDetail()">Close</button>
+      <button class="btn btn-primary" onclick="closeDetail();openEditModal('${a.id}')">Edit</button>
+    </div>`;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+function closeDetail(e) {
+  if (!e || e.target === document.getElementById('detail-overlay'))
+    document.getElementById('detail-overlay').classList.remove('open');
+}
+function downloadFile(jsonStr) {
+  const f = JSON.parse(jsonStr);
+  const a = document.createElement('a'); a.href = f.data; a.download = f.name; a.click();
+}
+
+// ── Delete ────────────────────────────────────────────────
+async function deleteApp(id) {
+  const a = loadApps().find(x => x.id === id);
+  if (!a) return;
+  if (!await confirm(`Delete application for ${a.role} at ${a.company}?`, 'This cannot be undone.')) return;
+  saveApps(loadApps().filter(x => x.id !== id));
+  renderTable(); toast('Application deleted');
+}
+function confirm(title, msg) {
+  return new Promise(resolve => {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').textContent = msg;
+    document.getElementById('confirm-overlay').classList.add('open');
+    confirmResolve = val => { document.getElementById('confirm-overlay').classList.remove('open'); resolve(val); };
+  });
+}
+
+// ── Resume ────────────────────────────────────────────────
+function renderResume() {
+  const r = loadResume();
+  const section = document.getElementById('resume-section');
+  if (r) {
+    section.innerHTML = `
+      <div class="resume-current">
+        <div class="resume-icon">📄</div>
+        <div class="resume-info"><div class="rname">${esc(r.name)}</div><div class="rdate">Uploaded ${new Date(r.uploadedAt).toLocaleDateString()}</div></div>
+        <div class="resume-actions">
+          <button class="btn btn-ghost btn-sm" onclick="downloadResume()">⬇ Download</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteResume()">Remove</button>
+        </div>
+      </div>
+      <label class="big-upload" style="padding:20px">
+        <input type="file" accept=".pdf,.docx,.doc" onchange="uploadResume(event)">
+        <p><strong>Replace resume</strong> — click to upload a new file</p>
+      </label>`;
+  } else {
+    section.innerHTML = `
+      <label class="big-upload">
+        <input type="file" accept=".pdf,.docx,.doc" onchange="uploadResume(event)">
+        <div class="upload-icon">📤</div>
+        <p><strong>Click to upload your resume</strong></p>
+        <p style="margin-top:6px">PDF or DOCX, up to 5 MB</p>
+      </label>`;
+  }
+}
+function uploadResume(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('File too large (max 5 MB)'); return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    saveResume({ name: file.name, data: ev.target.result, type: file.type, uploadedAt: new Date().toISOString() });
+    renderResume(); toast('Resume uploaded');
+  };
+  reader.readAsDataURL(file);
+}
+function downloadResume() {
+  const r = loadResume(); if (!r) return;
+  const a = document.createElement('a'); a.href = r.data; a.download = r.name; a.click();
+}
+async function deleteResume() {
+  if (!await confirm('Remove resume?', 'Your resume will be removed from the tracker.')) return;
+  localStorage.removeItem(RESUME_KEY);
+  writeToSyncFile();
+  renderResume(); toast('Resume removed');
+}
+
+// ── Export: XLSX ──────────────────────────────────────────
+function exportXLSX() {
+  const apps = loadApps();
+  const rows = apps.map(a => ({
+    'Company':         a.company || '',
+    'Role':            a.role || '',
+    'Status':          (STATUS_META[a.status] || {}).label || a.status || '',
+    'Date Applied':    a.dateApplied || '',
+    'Deadline':        a.deadline || '',
+    'Job URL':         a.url || '',
+    'Contact Name':    a.contactName || '',
+    'Contact Email':   a.contactEmail || '',
+    'Interview Dates': (a.interviewDates || []).join('; '),
+    'Has Cover Letter': a.coverLetter ? 'Yes' : 'No',
+    'Notes':           a.notes || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // Column widths
+  ws['!cols'] = [20,28,14,14,14,40,20,28,30,16,40].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Applications');
+  XLSX.writeFile(wb, `internship-tracker-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ── Export: JSON ──────────────────────────────────────────
+function exportJSON() {
+  const data = { apps: loadApps(), resume: loadResume(), exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `internship-tracker-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ── Import: JSON ──────────────────────────────────────────
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!await confirm('Import data?', 'This will merge imported applications with your existing data.')) return;
+      if (Array.isArray(data.apps)) {
+        const existing = loadApps();
+        const ids = new Set(existing.map(a => a.id));
+        saveApps([...existing, ...data.apps.filter(a => !ids.has(a.id))]);
+      }
+      if (data.resume) saveResume(data.resume);
+      renderTable(); toast(`Imported ${data.apps?.length || 0} applications`);
+    } catch { toast('Invalid file format'); }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ── Export dropdown ───────────────────────────────────────
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  document.getElementById('export-menu').classList.toggle('open');
+}
+function closeExportMenu() { document.getElementById('export-menu').classList.remove('open'); }
+document.addEventListener('click', closeExportMenu);
+
+// ── Toast ─────────────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Init ──────────────────────────────────────────────────
+async function init() {
+  // Restore file handle from IndexedDB
+  const handle = await idbGet('fileHandle');
+  const name   = await idbGet('fileName');
+  if (handle) {
+    syncFileHandle = handle;
+    syncFileName   = name || handle.name;
+    // Read latest data from the file
+    const loaded = await readFromSyncFile();
+    if (!loaded) updateSyncStatus('stale');
+  } else {
+    updateSyncStatus('none');
+    // Show sync banner once
+    if (!localStorage.getItem(SYNC_DISMISSED)) {
+      document.getElementById('sync-banner').classList.add('show');
+    }
+  }
+  renderTable();
+}
+
+init();
+</script>
+</body>
+</html>
