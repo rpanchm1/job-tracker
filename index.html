@@ -627,6 +627,21 @@
   </div>
 </div>
 
+<!-- Welcome Modal -->
+<div class="overlay" id="welcome-overlay">
+  <div class="modal" style="max-width:480px;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">🎓</div>
+    <h2 style="font-size:22px;margin-bottom:6px">Job Tracker</h2>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Built by Roman Panchmia</p>
+    <div style="background:var(--bg);border-radius:10px;padding:16px;text-align:left;font-size:14px;line-height:1.7;color:var(--text-muted);margin-bottom:20px">
+      <p>Hey — I'm Roman, a CS grad from Binghamton University, Class of 2026. I built this tool to keep track of all the jobs I've been applying to during what can only be described as a <em>pretty hectic</em> time in the job market.</p>
+      <p style="margin-top:10px">It's free to use — your data stays in your own browser and never touches a server.</p>
+    </div>
+    <button class="btn btn-primary" style="width:100%;padding:12px" onclick="closeWelcome()">Get Started</button>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:10px">This message won't show again on this device</p>
+  </div>
+</div>
+
 <!-- Help Modal -->
 <div class="overlay" id="help-overlay" onclick="closeHelp(event)">
   <div class="modal" style="max-width:500px">
@@ -1252,6 +1267,12 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
+// ── Welcome modal ─────────────────────────────────────────
+function closeWelcome() {
+  document.getElementById('welcome-overlay').classList.remove('open');
+  localStorage.setItem('itracker_welcomed', '1');
+}
+
 // ── Help modal ────────────────────────────────────────────
 function openHelpModal() { document.getElementById('help-overlay').classList.add('open'); }
 function closeHelpModal() { document.getElementById('help-overlay').classList.remove('open'); }
@@ -1276,6 +1297,9 @@ async function init() {
     }
   }
   renderTable();
+  if (!localStorage.getItem('itracker_welcomed')) {
+    document.getElementById('welcome-overlay').classList.add('open');
+  }
 }
 
 init();
