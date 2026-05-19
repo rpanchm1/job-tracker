@@ -457,6 +457,7 @@
     <span id="sync-label">Local only</span>
   </button>
   <button class="sync-pill" onclick="openHelpModal()" title="Help" style="padding:5px 10px;font-size:15px;margin-left:0">?</button>
+  <button class="sync-pill" onclick="openWelcome()" title="About" style="padding:5px 12px;font-size:13px;margin-left:0">About</button>
 </header>
 
 <main>
@@ -1268,6 +1269,7 @@ function toast(msg) {
 }
 
 // ── Welcome modal ─────────────────────────────────────────
+function openWelcome() { document.getElementById('welcome-overlay').classList.add('open'); }
 function closeWelcome() {
   document.getElementById('welcome-overlay').classList.remove('open');
   localStorage.setItem('itracker_welcomed', '1');
