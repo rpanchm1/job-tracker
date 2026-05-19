@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Job Tracker</title>
+  <title>Internship Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -447,7 +447,7 @@
 <body>
 
 <header>
-  <h1>🎓 Job Tracker</h1>
+  <h1>🎓 Internship Tracker</h1>
   <nav>
     <button class="active" onclick="showView('apps')">Applications</button>
     <button onclick="showView('resume')">Resume</button>
@@ -456,6 +456,7 @@
     <span class="sync-dot none" id="sync-dot"></span>
     <span id="sync-label">Local only</span>
   </button>
+  <button class="sync-pill" onclick="openHelpModal()" title="Help" style="padding:5px 10px;font-size:15px;margin-left:0">?</button>
 </header>
 
 <main>
@@ -622,6 +623,38 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="confirmResolve(false)">Cancel</button>
       <button class="btn btn-danger" onclick="confirmResolve(true)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="overlay" id="help-overlay" onclick="closeHelp(event)">
+  <div class="modal" style="max-width:500px">
+    <h2>How to sync across devices</h2>
+    <div style="font-size:14px;color:var(--text-muted);line-height:1.7">
+      <p style="margin-bottom:12px">By default your data is saved in this browser only. To access it on any device, connect a sync file stored in Google Drive, OneDrive, or Dropbox.</p>
+      <div style="background:var(--bg);border-radius:8px;padding:16px;margin-bottom:12px">
+        <strong style="color:var(--text)">First device (setup)</strong>
+        <ol style="margin-top:8px;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+          <li>Click the <strong>Local only</strong> pill in the top-right</li>
+          <li>Click <strong>Create a new sync file</strong></li>
+          <li>Save it inside your Google Drive / OneDrive folder</li>
+          <li>The dot turns green — you're synced ✓</li>
+        </ol>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:16px;margin-bottom:12px">
+        <strong style="color:var(--text)">Other devices</strong>
+        <ol style="margin-top:8px;padding-left:18px;display:flex;flex-direction:column;gap:6px">
+          <li>Wait for Google Drive / OneDrive to sync the file</li>
+          <li>Open this site and click <strong>Local only</strong></li>
+          <li>Click <strong>Open existing sync file</strong></li>
+          <li>Select the same file from your cloud folder</li>
+        </ol>
+      </div>
+      <p style="font-size:12px">⚠ Sync requires Chrome or Edge. Firefox is not supported.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeHelpModal()">Got it</button>
     </div>
   </div>
 </div>
@@ -1218,6 +1251,11 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
+
+// ── Help modal ────────────────────────────────────────────
+function openHelpModal() { document.getElementById('help-overlay').classList.add('open'); }
+function closeHelpModal() { document.getElementById('help-overlay').classList.remove('open'); }
+function closeHelp(e) { if (e.target === document.getElementById('help-overlay')) closeHelpModal(); }
 
 // ── Init ──────────────────────────────────────────────────
 async function init() {
